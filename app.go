@@ -437,7 +437,7 @@ func DoneRCA(uname, text, channelID string, status int) (string, error) {
 	return fmt.Sprintf("_RCA %s (`%s`) %s by %s_", v.Title, desc[0], setTo, uname), SetDoneRCAData(channelID, desc[0], status)
 }
 
-func SetPMA(uname, text, channelID string) (string, error) {
+func SetPMA(uname, channelID, text string) (string, error) {
 	desc := strings.Split(text, " ")
 
 	if len(desc) < 2 || desc[0] == "" || desc[1] == "" {
