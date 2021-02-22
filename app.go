@@ -43,7 +43,6 @@ var (
 
 var (
 	FirebaseClient *db.Client
-	actionRef      *db.Ref
 )
 
 type Job struct {
@@ -92,8 +91,6 @@ func main() {
 	webserver, fbClient := initConfigAndModules()
 	FirebaseClient = fbClient
 
-	actionRef = initFBRef(fbClient)
-
 	cronM = &Cron{
 		listenErrCh: make(chan error),
 	}
@@ -127,7 +124,7 @@ func RegisterReloadCron() {
 	})
 
 	reloadCronTask = cron.New()
-	c.Run(reloadCronTask)
+	c.Run(reloadCronTask, false)
 }
 
 func RegisterHeartBeatCron() {
@@ -139,12 +136,20 @@ func RegisterHeartBeatCron() {
 		Interval: "* * * * *", //every minute
 		Handler: func() {
 			Println(nil, "alive")
-			httpClient.Get("https://example.com")
+			res, err := httpClient.Get("https://heartbeat-internal-rca.herokuapp.com/")
+			if err != nil {
+				return
+			}
+
+			defer res.Body.Close()
+
+			data, _ := ioutil.ReadAll(res.Body)
+			Println(nil, string(data))
 		},
 	})
 
 	heartbeatCronTask = cron.New()
-	c.Run(heartbeatCronTask)
+	c.Run(heartbeatCronTask, false)
 }
 
 func RegisterCron() {
@@ -184,7 +189,7 @@ func RegisterCron() {
 		cronJobID = cronM.RemoveAllRunningCron(cronJobID, cronTask)
 	}
 
-	cronM.Run(cronTask)
+	cronM.Run(cronTask, true)
 	Info("[!!!] Cron is Running! v1.5")
 }
 
@@ -195,11 +200,6 @@ func (c Cron) RemoveAllRunningCron(ids []cron.EntryID, task *cron.Cron) []cron.E
 	}
 
 	return []cron.EntryID{}
-}
-
-func initFBRef(client *db.Client) *db.Ref {
-	actionRef := client.NewRef("ActionRequest")
-	return actionRef
 }
 
 func initConfigAndModules() (*WebServer, *db.Client) {
@@ -247,6 +247,14 @@ func (api API) Register(router *httprouter.Router) {
 		api.HandleCommand,
 	)
 
+	router.GET("/",
+		api.HandleHeartbeat,
+	)
+
+}
+
+func (api API) HandleHeartbeat(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
+	WriteResponse(w, "pong")
 }
 
 func (api API) HandleCommand(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
@@ -591,7 +599,7 @@ func getFunctionName(i interface{}) string {
 	return runtime.FuncForPC(reflect.ValueOf(i).Pointer()).Name()
 }
 
-func (c *Cron) Run(taskCron *cron.Cron) {
+func (c *Cron) Run(taskCron *cron.Cron, setToList bool) {
 
 	if len(c.crons) == 0 {
 		Println(nil, "[!!!] Cron is Empty!")
@@ -604,9 +612,11 @@ func (c *Cron) Run(taskCron *cron.Cron) {
 		//fname := fnameTemp[len(fnameTemp)-1]
 		id, err := taskCron.AddFunc(j.Interval, j.Handler)
 
-		mtx.Lock()
-		cronJobID = append(cronJobID, id)
-		mtx.Unlock()
+		if setToList {
+			mtx.Lock()
+			cronJobID = append(cronJobID, id)
+			mtx.Unlock()
+		}
 
 		if err != nil {
 			Println(nil, "Assign Job ERROR: ", err)
