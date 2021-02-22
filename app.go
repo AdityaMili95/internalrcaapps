@@ -276,6 +276,7 @@ func (api API) HandleCommand(w http.ResponseWriter, r *http.Request, p httproute
 			directMsg, err = SetScheduler(uname, channelID, "")
 		} else if command == "/setslackwebhook" {
 			directMsg, err = SetWebhook(uname, channelID, text)
+			directChannelKey = text
 		} else if command == "/setfooter" {
 			directMsg, err = SetFooter(uname, channelID, text)
 		} else if command == "/setpma" {
