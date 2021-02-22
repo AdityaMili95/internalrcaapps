@@ -335,7 +335,7 @@ func NotifySlack(message SlackMsgStructure, channelKey string) error {
 }
 
 func HelpRCA() string {
-	return "*Internal RCA BOT Command Help*\n\n• `/listrca` - Get List Active RCA :memo::memo:\n• `/listdonerca` - Get list of Done RCA\n• `/addrca - Title Desc Assignee [PMATicketURL] [Staging|Production]` - Add New RCA\n• `/removerca issueID` - Remove RCA\n• `/donerca issueID` - Set RCA to Done\n• `/doneallrca` - *Done all* active RCA :warning::warning:\n• `/setpma issueID PMATicketURL` - Set PMA Ticket for issue\n• `/setscheduler schedule` (*<https://pkg.go.dev/github.com/robfig/cron/v3|format>*) - Set Scheduler for RCA List\n• `/setslackwebhook webhook_key` - Set slack webhook for scheduler (*for the webhook url*, contact: <@U75J4HEF9>)\n• `/removescheduler` - Remove Scheduler for RCA List \n• `/setfooter text` - Set *Custom* footer notes that shown at the bottom of RCA List\n• `/internalrcahelp` - Command list for RCA & Sharing Bot"
+	return "*Internal RCA BOT Command Help*\n\n• `/listrca` - Get List Active RCA :memo::memo:\n• `/listdonerca` - Get list of Done RCA\n• `/addrca - (Title) (Desc) Assignee [PMATicketURL] [Staging|Production]` - Add New RCA, `use parentheses` for multi space text. *Sample*: (title multi) (desc multi) assignee pma staging\n• `/removerca issueID` - Remove RCA\n• `/donerca issueID` - Set RCA to Done\n• `/doneallrca` - *Done all* active RCA :warning::warning:\n• `/setpma issueID PMATicketURL` - Set PMA Ticket for issue\n• `/setscheduler schedule` (*<https://pkg.go.dev/github.com/robfig/cron/v3|format>*) - Set Scheduler for RCA List\n• `/setslackwebhook webhook_key` - Set slack webhook for scheduler (*for the webhook url*, contact: <@U75J4HEF9>)\n• `/removescheduler` - Remove Scheduler for RCA List \n• `/setfooter text` - Set *Custom* footer notes that shown at the bottom of RCA List\n• `/internalrcahelp` - Command list for RCA & Sharing Bot"
 }
 
 func RemoveScheduler(uname, channelID string) (string, error) {
@@ -475,28 +475,42 @@ func SetDoneRCAData(channelID, issueID string, status int) error {
 
 func AddRCA(uname, text, channelID string) (string, error) {
 
-	desc := strings.Split(text, " ")
+	desc := strings.Split(text, ")")
+	pops := []string{}
 
-	if len(desc) < 3 {
-		return "", errors.New("Command invalid")
+	for _, v := range desc {
+		if strings.Contains(v, "(") {
+			// multi space
+			v = strings.Trim(v, " ")
+			v = strings.Replace(v, "(", "", -1)
+			pops = append(pops, v)
+			continue
+		}
+
+		spaces := strings.Split(v, " ")
+		pops = append(pops, spaces...)
+	}
+
+	if len(pops) < 3 {
+		return "", errors.New("Command invalid, use parentheses (for multi space) *Sample*: (title multi) (desc multi) assignee pma staging")
 	}
 
 	pma := "" //optional
-	if len(desc) > 3 {
-		pma = desc[3]
+	if len(pops) > 3 {
+		pma = pops[3]
 	}
 
 	env := "Production" //optional
-	if len(desc) > 4 {
-		env = strings.Title(desc[4])
+	if len(pops) > 4 {
+		env = strings.Title(pops[4])
 	}
 
 	data := RCAData{
-		Assignee:    desc[2],
-		Description: desc[1],
+		Assignee:    pops[2],
+		Description: pops[1],
 		Environment: env,
 		Status:      0,
-		Title:       desc[0],
+		Title:       pops[0],
 		PMA:         pma,
 	}
 
@@ -505,7 +519,7 @@ func AddRCA(uname, text, channelID string) (string, error) {
 		return "", err
 	}
 
-	return fmt.Sprintf("_RCA %s Added by %s_", desc[0], uname), nil
+	return fmt.Sprintf("_RCA %s Added by %s_", pops[0], uname), nil
 }
 
 func CaptureCronPanic(handler func()) func() {
