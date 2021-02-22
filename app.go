@@ -182,7 +182,7 @@ func initConfigAndModules() (*WebServer, *db.Client) {
 	cfgWeb := &Option{
 		Environment: "development",
 		Domain:      "",
-		Port:        ":4567",
+		Port:        ":" + os.Getenv("PORT"),
 	}
 
 	webserver := NewWeb(cfgWeb)
