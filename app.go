@@ -12,6 +12,7 @@ import (
 	"runtime"
 	"strings"
 	"sync"
+	"time"
 
 	cron "github.com/robfig/cron/v3"
 
@@ -29,10 +30,12 @@ type Cron struct {
 }
 
 var (
-	cronTask       *cron.Cron
-	reloadCronTask *cron.Cron
+	cronTask          *cron.Cron
+	reloadCronTask    *cron.Cron
+	heartbeatCronTask *cron.Cron
 
-	cronM *Cron
+	httpClient *http.Client
+	cronM      *Cron
 
 	mtx       sync.Mutex
 	cronJobID = []cron.EntryID{}
@@ -95,8 +98,16 @@ func main() {
 		listenErrCh: make(chan error),
 	}
 
+	tr := &http.Transport{
+		MaxIdleConns:       10,
+		IdleConnTimeout:    1 * time.Second,
+		DisableCompression: true,
+	}
+	httpClient = &http.Client{Transport: tr}
+
 	RegisterCron()
 	RegisterReloadCron()
+	RegisterHeartBeatCron()
 
 	webserver.Run()
 }
@@ -108,7 +119,7 @@ func RegisterReloadCron() {
 	}
 
 	c.register(Job{
-		Interval: "25 * * * 1-5", //hourly
+		Interval: "25 * * * *", //hourly
 		Handler: func() {
 			fmt.Println(nil, "JALAN DONG: ", cronJobID)
 			RegisterCron()
@@ -117,6 +128,23 @@ func RegisterReloadCron() {
 
 	reloadCronTask = cron.New()
 	c.Run(reloadCronTask)
+}
+
+func RegisterHeartBeatCron() {
+	c := &Cron{
+		listenErrCh: make(chan error),
+	}
+
+	c.register(Job{
+		Interval: "* * * * *", //every minute
+		Handler: func() {
+			fmt.Println(nil, "alive")
+			httpClient.Get("https://example.com")
+		},
+	})
+
+	heartbeatCronTask = cron.New()
+	c.Run(heartbeatCronTask)
 }
 
 func RegisterCron() {
