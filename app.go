@@ -273,7 +273,7 @@ func (api API) HandleCommand(w http.ResponseWriter, r *http.Request, p httproute
 		} else if command == "/setscheduler" {
 			directMsg, err = SetScheduler(uname, channelID, text)
 		} else if command == "/removescheduler" {
-			directMsg, err = SetScheduler(uname, channelID, "")
+			directMsg, err = RemoveScheduler(uname, channelID)
 		} else if command == "/setslackwebhook" {
 			directMsg, err = SetWebhook(uname, channelID, text)
 			directChannelKey = text
@@ -338,20 +338,32 @@ func HelpRCA() string {
 	return "*Internal RCA BOT Command Help*\n\n• `/listrca` - Get List Active RCA :memo::memo:\n• `/listdonerca` - Get list of Done RCA\n• `/addrca - Title Desc Assignee [PMATicketURL] [Staging|Production]` - Add New RCA\n• `/removerca issueID` - Remove RCA\n• `/donerca issueID` - Set RCA to Done\n• `/doneallrca` - *Done all* active RCA :warning::warning:\n• `/setpma issueID PMATicketURL` - Set PMA Ticket for issue\n• `/setscheduler schedule` (*<https://pkg.go.dev/github.com/robfig/cron/v3|format>*) - Set Scheduler for RCA List\n• `/setslackwebhook webhook_key` - Set slack webhook for scheduler (*for the webhook url*, contact: <@U75J4HEF9>)\n• `/removescheduler` - Remove Scheduler for RCA List \n• `/setfooter text` - Set *Custom* footer notes that shown at the bottom of RCA List\n• `/internalrcahelp` - Command list for RCA & Sharing Bot"
 }
 
+func RemoveScheduler(uname, channelID string) (string, error) {
+	ctx := context.Background()
+	msg := fmt.Sprintf("_RCA List scheduler removed by %s_", uname)
+	err := FirebaseClient.NewRef(fmt.Sprintf("Scheduler/%s", channelID)).Delete(ctx)
+
+	if err == nil {
+		RegisterCron()
+	}
+
+	return msg, err
+}
+
 func SetScheduler(uname, channelID, text string) (string, error) {
+
+	desc := strings.Split(text, " ")
+	if len(desc) != 5 {
+		return "", errors.New("Format scheduler invalid sample: 0 14 * * * (*<https://pkg.go.dev/github.com/robfig/cron/v3|format>*)")
+	}
+
 	ctx := context.Background()
 
 	updateTxn := func(node db.TransactionNode) (interface{}, error) {
 		return text, nil
 	}
 
-	action := "removed"
-
-	if text != "" {
-		action = fmt.Sprintf("set to %s", text)
-	}
-
-	msg := fmt.Sprintf("_RCA List scheduler %s by %s_", action, uname)
+	msg := fmt.Sprintf("_RCA List scheduler set to %s by %s_", text, uname)
 	err := FirebaseClient.NewRef(fmt.Sprintf("Scheduler/%s", channelID)).Transaction(ctx, updateTxn)
 
 	if err == nil {
@@ -653,7 +665,7 @@ func ConstructRCADataString(v Channel, getStatus int, uname string) SlackMsgStru
 
 	} else {
 
-		foot := "\n`Lets maintain our stability together with #gotongroyong and #makeithappenmakeitbetter spirit` :muscle: \n\n_*Please prepare the Deck* ya Team!"
+		foot := "\n`Lets maintain our stability together with #gotongroyong and #makeithappenmakeitbetter spirit` :muscle: \n\n_*Please prepare the Deck*_ ya Team!"
 
 		if v.Footer != "" {
 			foot = v.Footer
