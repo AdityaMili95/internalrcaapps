@@ -479,9 +479,11 @@ func AddRCA(uname, text, channelID string) (string, error) {
 	pops := []string{}
 
 	for _, v := range desc {
+
+		v = strings.Trim(v, " ")
+
 		if strings.Contains(v, "(") {
 			// multi space
-			v = strings.Trim(v, " ")
 			v = strings.Replace(v, "(", "", -1)
 			pops = append(pops, v)
 			continue
