@@ -374,6 +374,10 @@ func SetFooter(uname, channelID, text string) (string, error) {
 func SetWebhook(uname, channelID, text string) (string, error) {
 	ctx := context.Background()
 
+	if text == "" {
+		return "", errors.New("Webhook URL Not Present")
+	}
+
 	updateTxn := func(node db.TransactionNode) (interface{}, error) {
 		return text, nil
 	}
