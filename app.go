@@ -113,7 +113,7 @@ func main() {
 }
 
 func RegisterReloadCron() {
-	fmt.Println("REINIT RELOAD CRON")
+	Println(nil, "REINIT RELOAD CRON")
 	c := &Cron{
 		listenErrCh: make(chan error),
 	}
@@ -121,7 +121,7 @@ func RegisterReloadCron() {
 	c.register(Job{
 		Interval: "25 * * * *", //hourly
 		Handler: func() {
-			fmt.Println(nil, "JALAN DONG: ", cronJobID)
+			Println(nil, "JALAN DONG: ", cronJobID)
 			RegisterCron()
 		},
 	})
@@ -138,7 +138,7 @@ func RegisterHeartBeatCron() {
 	c.register(Job{
 		Interval: "* * * * *", //every minute
 		Handler: func() {
-			fmt.Println(nil, "alive")
+			Println(nil, "alive")
 			httpClient.Get("https://example.com")
 		},
 	})
@@ -149,7 +149,7 @@ func RegisterHeartBeatCron() {
 
 func RegisterCron() {
 
-	fmt.Println("REINIT CRON")
+	Println(nil, "REINIT CRON")
 
 	var err error
 	cronSchedule, err := GetAllSchedulerData()
