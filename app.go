@@ -293,7 +293,10 @@ func (api API) HandleInteractive(w http.ResponseWriter, r *http.Request, p httpr
 
 	var payload InteractivePayload
 
-	err := json.NewDecoder(r.Body).Decode(&payload)
+	Printf(nil, "XXXXXXXXXX%+v", r)
+
+	pload := r.FormValue("payload")
+	err := json.Unmarshal([]byte(pload), &payload)
 	if err != nil || payload.Channel.ID == "" || payload.User.Username == "" || len(payload.Action) == 0 || payload.Action[0].Value == "" || payload.Action[0].Text.Text == "" {
 		Printf(nil, "[Custom Binary] Interactive Payload decode error: %+v, request: %+v", err, r)
 		resp := Response{
@@ -304,8 +307,6 @@ func (api API) HandleInteractive(w http.ResponseWriter, r *http.Request, p httpr
 		WriteResponse(w, resp)
 		return
 	}
-
-	Printf(nil, "XXXXXXXXXX%+v", r)
 
 	channelID := payload.Channel.ID
 	command := payload.Action[0].Text.Text
