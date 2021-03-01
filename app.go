@@ -652,11 +652,15 @@ func AddRCA(uname, text, channelID string) (string, error) {
 	}
 
 	ctx := context.Background()
-	if err := FirebaseClient.NewRef(fmt.Sprintf("Channel/%s/data/%s", channelID, uuid.New())).Set(ctx, data); err != nil {
+	if err := FirebaseClient.NewRef(fmt.Sprintf("Channel/%s/data/%s", channelID, GetIssueID())).Set(ctx, data); err != nil {
 		return "", err
 	}
 
 	return fmt.Sprintf("_RCA %s Added by %s_", pops[0], uname), nil
+}
+
+func GetIssueID() string {
+	return fmt.Sprintf("%s-%s", time.Now().UnixNano(), uuid.New())
 }
 
 func CaptureCronPanic(handler func()) func() {
