@@ -292,10 +292,8 @@ type InteractiveActionData struct {
 func (api API) HandleInteractive(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
 
 	var payload InteractivePayload
-
-	Printf(nil, "XXXXXXXXXX%+v", r)
-
 	pload := r.FormValue("payload")
+
 	err := json.Unmarshal([]byte(pload), &payload)
 	if err != nil || payload.Channel.ID == "" || payload.User.Username == "" || len(payload.Action) == 0 || payload.Action[0].Value == "" || payload.Action[0].Text.Text == "" {
 		Printf(nil, "[Custom Binary] Interactive Payload decode error: %+v, request: %+v", err, r)
