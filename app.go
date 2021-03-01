@@ -247,6 +247,10 @@ func (api API) Register(router *httprouter.Router) {
 		api.HandleCommand,
 	)
 
+	router.POST("/interactive",
+		api.HandleInteractive,
+	)
+
 	router.GET("/",
 		api.HandleHeartbeat,
 	)
@@ -255,6 +259,95 @@ func (api API) Register(router *httprouter.Router) {
 
 func (api API) HandleHeartbeat(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
 	WriteResponse(w, "pong")
+}
+
+type InteractivePayload struct {
+	User        InteractiveUserData     `json:"user"`
+	Channel     InteractiveChannelData  `json:"channel"`
+	ResponseURL string                  `json:"response_url"`
+	Type        string                  `json:"type"`
+	Action      []InteractiveActionData `json:"actions"`
+}
+
+type InteractiveUserData struct {
+	ID       string `json:"id"`
+	Username string `json:"username"`
+	TeamID   string `json:"team_id"`
+}
+
+type InteractiveChannelData struct {
+	ID   string `json:"id"`
+	Name string `json:"name"`
+}
+
+type InteractiveActionData struct {
+	ActionID string       `json:"action_id"`
+	BlockID  string       `json:"block_id"`
+	Text     BlockAccText `json:"text"`
+	Value    string       `json:"value"`
+	Type     string       `json:"type"`
+	ActionTS string       `json:"action_ts"`
+}
+
+func (api API) HandleInteractive(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
+
+	var payload InteractivePayload
+
+	err := json.NewDecoder(r.Body).Decode(&payload)
+	if err != nil || payload.Channel.ID == "" || payload.User.Username == "" || len(payload.Action) == 0 || payload.Action[0].Value == "" || payload.Action[0].Text.Text == "" {
+		Printf(nil, "[Custom Binary] Interactive Payload decode error: %+v, request: %+v", err, r)
+		resp := Response{
+			ResponseType: "ephemeral",
+			Text:         fmt.Sprintf("Sorry System Error: Bad Payload :("),
+		}
+
+		WriteResponse(w, resp)
+		return
+	}
+
+	channelID := payload.Channel.ID
+	command := payload.Action[0].Text.Text
+	value := payload.Action[0].Value
+	uname := payload.User.Username
+
+	directChannelKey := ""
+	directMsg := ""
+
+	tempSlackMsg := SlackMsgStructure{}
+	channelData := Channel{}
+
+	if WebhookRequiredCommand(command) {
+		channelData, err = GetRCAData(channelID)
+
+		if err == nil && channelData.ChannelKey == "" {
+			err = errors.New("Channel Webhook not set, set using command /setslackwebhook [webhook_key]")
+		} else if err == nil {
+			directChannelKey = channelData.ChannelKey
+		}
+	}
+
+	if err == nil {
+		if command == "Set Done" {
+			directMsg, err = DoneRCA(uname, value, channelID, 1)
+		}
+	}
+
+	if err != nil {
+		resp := Response{
+			ResponseType: "ephemeral",
+			Text:         err.Error(),
+		}
+		WriteResponse(w, resp)
+		return
+	}
+
+	if directMsg != "" {
+		tempblock := GetSlackMessageStructure(directMsg)
+		tempSlackMsg.Blocks = append(tempSlackMsg.Blocks, tempblock)
+		NotifySlack(tempSlackMsg, directChannelKey)
+		return
+	}
+
 }
 
 func (api API) HandleCommand(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
@@ -643,8 +736,8 @@ func ConstructRCADataString(v Channel, getStatus int, uname string) SlackMsgStru
 
 	title += fmt.Sprintf("*Internal Sharing & RCA List*\n\n")
 
-	staging := ""
-	production := ""
+	staging := []BlockStructure{}
+	production := []BlockStructure{}
 
 	emot := "bangbang"
 
@@ -664,10 +757,11 @@ func ConstructRCADataString(v Channel, getStatus int, uname string) SlackMsgStru
 			pma = fmt.Sprintf("- <%s|*PMA*> ", is.PMA)
 		}
 
+		access := GetSlackAccessory("Set Done", issueID)
 		if is.Environment == "Staging" {
-			staging += fmt.Sprintf(">\t:%s:  *%s* %s\n\t\t\t• `Issue ID:` %s\n\t\t\t• `Description:` %s\n\t\t\t• `Assignee:` %s\n\n", emot, is.Title, pma, issueID, is.Description, is.Assignee)
+			staging = append(staging, GetSlackMessageStructure(fmt.Sprintf(">\t:%s:  *%s* %s\n\t\t\t• `Issue ID:` %s\n\t\t\t• `Description:` %s\n\t\t\t• `Assignee:` %s\n\n", emot, is.Title, pma, issueID, is.Description, is.Assignee), access))
 		} else {
-			production += fmt.Sprintf(">\t:%s:  *%s* %s\n>\t\t\t• `Issue ID:` %s\n>\t\t\t• `Description:` %s\n>\t\t\t• `Assignee:` %s\n\n", emot, is.Title, pma, issueID, is.Description, is.Assignee)
+			production = append(production, GetSlackMessageStructure(fmt.Sprintf(">\t:%s:  *%s* %s\n>\t\t\t• `Issue ID:` %s\n>\t\t\t• `Description:` %s\n>\t\t\t• `Assignee:` %s\n\n", emot, is.Title, pma, issueID, is.Description, is.Assignee), access))
 		}
 	}
 
@@ -677,24 +771,28 @@ func ConstructRCADataString(v Channel, getStatus int, uname string) SlackMsgStru
 
 	anyRCA := false
 
-	if staging != "" {
+	if len(staging) > 0 {
 		anyRCA = true
-		block := GetSlackMessageStructure(":arrow_right: `Environment: Staging`\n\n" + staging)
+		//block := GetSlackMessageStructure(":arrow_right: `Environment: Staging`\n\n" + staging)
 		slackMsg.Blocks = append(slackMsg.Blocks, GetSlackDividerBlock())
-		slackMsg.Blocks = append(slackMsg.Blocks, block)
+		slackMsg.Blocks = append(slackMsg.Blocks, GetSlackMessageStructure(":arrow_right: `Environment: Staging`\n\n"))
+		slackMsg.Blocks = append(slackMsg.Blocks, staging...)
 
 	}
 
-	if production != "" {
+	if len(production) > 0 {
 		anyRCA = true
 		spacing := ""
-		if staging != "" {
+		if len(staging) > 0 {
 			spacing += "\n\n"
 		}
 
-		block := GetSlackMessageStructure(spacing + ":arrow_right: `Environment: Production`\n\n" + production)
+		//block := GetSlackMessageStructure(spacing + ":arrow_right: `Environment: Production`\n\n" + production)
+
 		slackMsg.Blocks = append(slackMsg.Blocks, GetSlackDividerBlock())
-		slackMsg.Blocks = append(slackMsg.Blocks, block)
+		slackMsg.Blocks = append(slackMsg.Blocks, GetSlackMessageStructure(spacing+":arrow_right: `Environment: Production`\n\n"))
+		slackMsg.Blocks = append(slackMsg.Blocks, production...)
+
 	}
 
 	if !anyRCA || getStatus == 1 {
@@ -735,14 +833,32 @@ func ConstructRCADataString(v Channel, getStatus int, uname string) SlackMsgStru
 	return slackMsg
 }
 
-func GetSlackMessageStructure(msg string) BlockStructure {
-	return BlockStructure{
+func GetSlackAccessory(text, value string) *BlockAcc {
+	return &BlockAcc{
+		Type:  "button",
+		Value: value,
+		Text: BlockAccText{
+			Type:  "plain_text",
+			Text:  text,
+			Emoji: true,
+		},
+	}
+}
+
+func GetSlackMessageStructure(msg string, acc ...*BlockAcc) BlockStructure {
+	b := BlockStructure{
 		Type: "section",
 		Text: &BlockText{
 			Type: "mrkdwn",
 			Text: msg,
 		},
 	}
+
+	if len(acc) > 0 {
+		b.Accessory = acc[0]
+	}
+
+	return b
 }
 
 func GetSlackDividerBlock() BlockStructure {

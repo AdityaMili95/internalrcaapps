@@ -49,13 +49,26 @@ type SlackMsgStructure struct {
 }
 
 type BlockStructure struct {
-	Type string     `json:"type,omitempty"`
-	Text *BlockText `json:"text,omitempty"`
+	Type      string     `json:"type,omitempty"`
+	Text      *BlockText `json:"text,omitempty"`
+	Accessory *BlockAcc  `json:"accessory,omitempty"`
 }
 
 type BlockText struct {
 	Type string `json:"type,omitempty"`
 	Text string `json:"text,omitempty"`
+}
+
+type BlockAcc struct {
+	Type  string       `json:"type,omitempty"`
+	Text  BlockAccText `json:"text,omitempty"`
+	Value string       `json:"value,omitempty"`
+}
+
+type BlockAccText struct {
+	Type  string `json:"type,omitempty"`
+	Text  string `json:"text,omitempty"`
+	Emoji bool   `json:"emoji,omitempty"`
 }
 
 func (s *SlackModule) PublishSlack(slackMsg SlackMsgStructure) error {
