@@ -10,6 +10,7 @@ import (
 	"os"
 	"reflect"
 	"runtime"
+	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -43,6 +44,10 @@ var (
 
 var (
 	FirebaseClient *db.Client
+)
+
+const (
+	MaxSlackDoneRCA = 15
 )
 
 type Job struct {
@@ -736,9 +741,12 @@ func ConstructRCADataString(v Channel, getStatus int, uname string) SlackMsgStru
 	}
 
 	title += fmt.Sprintf("*Internal Sharing & RCA List*\n\n")
-
 	staging := []BlockStructure{}
 	production := []BlockStructure{}
+
+	filteredKey := []string{}                  //issueID
+	mapBlockMsg := map[string]BlockStructure{} //issueID -> msg
+	mapEnvi := map[string]string{}
 
 	emot := "bangbang"
 
@@ -747,7 +755,19 @@ func ConstructRCADataString(v Channel, getStatus int, uname string) SlackMsgStru
 		emot = "white_check_mark"
 	}
 
-	for issueID, is := range v.Data {
+	issueKeys := []string{}
+	for k := range v.Data {
+		issueKeys = append(issueKeys, k)
+	}
+	sort.Strings(issueKeys)
+
+	for i := len(issueKeys) - 1; i >= 0; i-- {
+
+		issueID := issueKeys[i]
+		is := v.Data[issueID]
+
+		Println(nil, issueID)
+
 		if is.Status != getStatus {
 			continue
 		}
@@ -759,11 +779,37 @@ func ConstructRCADataString(v Channel, getStatus int, uname string) SlackMsgStru
 		}
 
 		access := GetSlackAccessory("Set Done", issueID)
-		if is.Environment == "Staging" {
+		/*if is.Environment == "Staging" {
 			staging = append(staging, GetSlackMessageStructure(fmt.Sprintf(">\t:%s:  *%s* %s\n\t\t\t• `Issue ID:` %s\n\t\t\t• `Description:` %s\n\t\t\t• `Assignee:` %s\n\n", emot, is.Title, pma, issueID, is.Description, is.Assignee), access))
 		} else {
 			production = append(production, GetSlackMessageStructure(fmt.Sprintf(">\t:%s:  *%s* %s\n>\t\t\t• `Issue ID:` %s\n>\t\t\t• `Description:` %s\n>\t\t\t• `Assignee:` %s\n\n", emot, is.Title, pma, issueID, is.Description, is.Assignee), access))
+		}*/
+
+		envi := "Staging"
+		if is.Environment != "Staging" {
+			envi = "Production"
 		}
+
+		filteredKey = append(filteredKey, issueID)
+		tempBlockStructure := GetSlackMessageStructure(fmt.Sprintf(">\t:%s:  *%s* %s\n\t\t\t• `Issue ID:` %s\n\t\t\t• `Description:` %s\n\t\t\t• `Assignee:` %s\n\n", emot, is.Title, pma, issueID, is.Description, is.Assignee), access)
+		mapBlockMsg[issueID] = tempBlockStructure
+		mapEnvi[issueID] = envi
+	}
+
+	if getStatus == 1 && len(filteredKey) > MaxSlackDoneRCA {
+		title += fmt.Sprintf("*Internal Sharing & RCA List - DONE - Last 15 %d*\n\n", MaxSlackDoneRCA)
+		filteredKey = filteredKey[:MaxSlackDoneRCA]
+	}
+
+	for _, key := range filteredKey {
+		envi := mapEnvi[key]
+
+		if envi == "Staging" {
+			staging = append(staging, mapBlockMsg[key])
+			continue
+		}
+
+		production = append(production, mapBlockMsg[key])
 	}
 
 	slackMsg := SlackMsgStructure{}
