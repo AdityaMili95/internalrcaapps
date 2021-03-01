@@ -305,6 +305,8 @@ func (api API) HandleInteractive(w http.ResponseWriter, r *http.Request, p httpr
 		return
 	}
 
+	Printf(nil, "XXXXXXXXXX%+v", r)
+
 	channelID := payload.Channel.ID
 	command := payload.Action[0].Text.Text
 	value := payload.Action[0].Value
