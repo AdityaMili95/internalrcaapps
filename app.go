@@ -660,7 +660,7 @@ func AddRCA(uname, text, channelID string) (string, error) {
 }
 
 func GetIssueID() string {
-	return fmt.Sprintf("%s-%s", time.Now().UnixNano(), uuid.New())
+	return fmt.Sprint(time.Now().UnixNano(), "-", uuid.New())
 }
 
 func CaptureCronPanic(handler func()) func() {
