@@ -748,12 +748,13 @@ func GetRCAData(channelID string) (Channel, error) {
 func ConstructRCADataString(v Channel, getStatus int, uname string) SlackMsgStructure {
 
 	title := ""
+	request := ""
 
 	if uname != "" {
-		title += fmt.Sprintf("_RCA List requested by %s_\n\n", uname)
+		request = fmt.Sprintf("_RCA List requested by %s_\n\n", uname)
 	}
 
-	title += fmt.Sprintf("*Internal Sharing & RCA List*\n\n")
+	title = request + fmt.Sprintf("*Internal Sharing & RCA List*\n\n")
 	staging := []BlockStructure{}
 	production := []BlockStructure{}
 
@@ -764,7 +765,7 @@ func ConstructRCADataString(v Channel, getStatus int, uname string) SlackMsgStru
 	emot := "bangbang"
 
 	if getStatus == 1 {
-		title += fmt.Sprintf("*Internal Sharing & RCA List - DONE*\n\n")
+		title = request + fmt.Sprintf("*Internal Sharing & RCA List - DONE*\n\n")
 		emot = "white_check_mark"
 	}
 
@@ -810,7 +811,7 @@ func ConstructRCADataString(v Channel, getStatus int, uname string) SlackMsgStru
 	}
 
 	if getStatus == 1 && len(filteredKey) > MaxSlackDoneRCA {
-		title += fmt.Sprintf("*Internal Sharing & RCA List - DONE - Last 15 %d*\n\n", MaxSlackDoneRCA)
+		title = request + fmt.Sprintf("*Internal Sharing & RCA List - DONE - Last 15 %d*\n\n", MaxSlackDoneRCA)
 		filteredKey = filteredKey[:MaxSlackDoneRCA]
 	}
 
